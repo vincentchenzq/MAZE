@@ -5,6 +5,191 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="X-UA-Compatible" content="ie=edge" />
         <title>MAZE</title>
+        <style>
+            #app {
+                display: flex;
+                flex-wrap: wrap;
+            }
+            .cell {
+                width: 40px;
+                height: 40px;
+                box-sizing: border-box;
+                border: 1px solid #ddd;
+                text-align: center;
+                line-height: 40px;
+                background-color: #000;
+            }
+            .cell.visited {
+                background-color: #f00;
+            }
+        </style>
     </head>
-    <body></body>
+    <body>
+        <canvas id="canvas" width="400" height="400"></canvas>
+        <div id="app"></div>
+        <script>
+            class MAZE {
+                constructor(col = 7, row = 7) {
+                    this.col = col; // 行数
+                    this.row = row; // 列数
+                    this.mazeList = []; // 用来存放迷宫的二维数组
+
+                    for (let i = 0; i < col; i++) {
+                        const mazeItem = (this.mazeList[i] = []);
+                        for (let j = 0; j < row; j++) {
+                            mazeItem.push({
+                                x: i,
+                                y: j,
+                                visited: false
+                            });
+                        }
+                    }
+
+                    /** @type {HTMLCanvasElement} */
+                    const canvas = document.getElementById('canvas');
+                    this.canvas = canvas;
+                    const { width } = canvas;
+                    this.ctx = canvas.getContext('2d');
+                    this.cellWidth = width / this.col;
+                    this.lineWidth = this.cellWidth / 4;
+                    this.ctx.clearRect(0, 0, width, width);
+                    this.toString();
+                    this.generate();
+                }
+
+                // 生成迷宫
+                generate() {
+                    // 缓存当前行数列数
+                    const colNum = this.col;
+                    const rowNum = this.row;
+                    // 缓存一个已访问的数组
+                    let visitedList = [];
+                    // 随机一个点
+                    let currentPoint = this.mazeList[this.random(colNum)][this.random(rowNum)];
+                    currentPoint.visited = true;
+                    visitedList.push(currentPoint);
+                    while (true) {
+                        const { x, y } = currentPoint;
+                        // 获得上下左右迷宫
+                        const upPoint = this.mazeList[x][y - 1] || {
+                            visited: true
+                        };
+                        const rightPoint = this.mazeList[x + 1]
+                            ? this.mazeList[x + 1][y]
+                            : {
+                                  visited: true
+                              };
+                        const downPoint = this.mazeList[x][y + 1] || {
+                            visited: true
+                        };
+                        const leftPoint = this.mazeList[x - 1]
+                            ? this.mazeList[x - 1][y]
+                            : {
+                                  visited: true
+                              };
+                        const neighborList = [];
+                        if (!upPoint.visited) {
+                            upPoint.direction = 'U';
+                            neighborList.push(upPoint);
+                        }
+                        if (!rightPoint.visited) {
+                            rightPoint.direction = 'R';
+                            neighborList.push(rightPoint);
+                        }
+                        if (!downPoint.visited) {
+                            downPoint.direction = 'D';
+                            neighborList.push(downPoint);
+                        }
+                        if (!leftPoint.visited) {
+                            leftPoint.direction = 'L';
+                            neighborList.push(leftPoint);
+                        }
+
+                        // 在这些格子中随机选择一个没有在访问列表中的格子，
+                        if (neighborList.length !== 0) {
+                            const neighborNode = neighborList[this.random(neighborList.length)];
+                            const { x: x1, y: y1, direction } = neighborNode;
+                            this.mazeList[x1][y1].visited = true;
+                            this.cleanWall(x, y, direction);
+                            visitedList.push(neighborNode);
+                            currentPoint = neighborNode;
+                        } else {
+                            // 如果周围所有的格子都已经访问过，则从已访问的列表中，随机选取一个作为当前访问的格子。
+                            currentPoint = visitedList[this.random(visitedList.length)];
+                            if (visitedList.length === colNum * rowNum) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // 将 0 0 格子 的左边作为入口 和 最后一个格子的下面作为终点
+                    this.cleanWall(0, 0, 'L');
+                    this.cleanWall(colNum - 1, rowNum - 1, 'D');
+                }
+
+                // 生成随机数
+                random(num) {
+                    return Math.floor(Math.random() * num);
+                }
+
+                // 清除四周的墙
+                cleanWall(x, y, direction) {
+                    const ctx = this.ctx;
+                    const cellWidth = this.cellWidth;
+                    const lineWidth = this.lineWidth;
+                    let x1;
+                    let y1;
+                    if (direction === 'U') {
+                        // 上
+                        x1 = cellWidth * x + lineWidth;
+                        y1 = cellWidth * y - lineWidth;
+                    } else if (direction === 'R') {
+                        // 右
+                        x1 = cellWidth * (x + 1) - lineWidth;
+                        y1 = cellWidth * y + lineWidth;
+                    } else if (direction === 'D') {
+                        // 下
+                        x1 = cellWidth * x + lineWidth;
+                        y1 = cellWidth * (y + 1) - lineWidth;
+                    } else if (direction === 'L') {
+                        // 左
+                        x1 = cellWidth * x - lineWidth;
+                        y1 = cellWidth * y + lineWidth;
+                    }
+                    const width = 2 * this.lineWidth;
+                    ctx.clearRect(x1, y1, width, width);
+                }
+                // 打印迷宫
+                toString() {
+                    const { width } = this.canvas;
+                    const cellWidth = this.cellWidth;
+                    const lineWidth = this.lineWidth;
+                    const ctx = this.ctx;
+                    ctx.lineWidth = lineWidth;
+                    this.mazeList.forEach((colItem, index) => {
+                        colItem.forEach((item, idx) => {
+                            const x1 = cellWidth * idx + lineWidth / 2;
+                            const y1 = cellWidth * index + lineWidth / 2;
+                            const width = 3 * lineWidth;
+                            ctx.beginPath();
+                            ctx.strokeStyle = `#${getRandomColor()}`;
+                            ctx.rect(x1, y1, width, width);
+                            ctx.stroke();
+                        });
+                    });
+                }
+            }
+            var maze = new MAZE(20, 20);
+
+            //随机颜色，十六进制方法；
+            function getRandomColor() {
+                var rand = Math.floor(Math.random() * 0xffffff).toString(16);
+                if (rand.length == 6) {
+                    return rand;
+                } else {
+                    return getRandomColor();
+                }
+            }
+        </script>
+    </body>
 </html>
