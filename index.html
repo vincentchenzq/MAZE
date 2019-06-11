@@ -5,45 +5,25 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="X-UA-Compatible" content="ie=edge" />
         <title>MAZE</title>
-        <style>
-            #app {
-                display: flex;
-                flex-wrap: wrap;
-            }
-            .cell {
-                width: 40px;
-                height: 40px;
-                box-sizing: border-box;
-                border: 1px solid #ddd;
-                text-align: center;
-                line-height: 40px;
-                background-color: #000;
-            }
-            .cell.visited {
-                background-color: #f00;
-            }
-        </style>
+        <style></style>
     </head>
     <body>
-        <canvas id="canvas" width="400" height="400"></canvas>
-        <div id="app"></div>
+        <div><span id="checkPoints"></span> <button onclick="next()">下一关</button></div>
+        <canvas id="canvas" width="800" height="800"></canvas>
         <script>
+            var rowNum = 1;
+            var maze;
+            function getMaze(x) {
+                maze = new MAZE(x, x);
+            }
             class MAZE {
                 constructor(col = 7, row = 7) {
+                    console.log(col);
                     this.col = col; // 行数
                     this.row = row; // 列数
+                    this.x = 0; // 记录当前的坐标
+                    this.y = 0; // 记录当前的坐标
                     this.mazeList = []; // 用来存放迷宫的二维数组
-
-                    for (let i = 0; i < col; i++) {
-                        const mazeItem = (this.mazeList[i] = []);
-                        for (let j = 0; j < row; j++) {
-                            mazeItem.push({
-                                x: i,
-                                y: j,
-                                visited: false
-                            });
-                        }
-                    }
 
                     /** @type {HTMLCanvasElement} */
                     const canvas = document.getElementById('canvas');
@@ -53,7 +33,6 @@
                     this.cellWidth = width / this.col;
                     this.lineWidth = this.cellWidth / 4;
                     this.ctx.clearRect(0, 0, width, width);
-                    this.toString();
                     this.generate();
                 }
 
@@ -64,6 +43,18 @@
                     const rowNum = this.row;
                     // 缓存一个已访问的数组
                     let visitedList = [];
+                    for (let i = 0; i < colNum; i++) {
+                        const mazeItem = (this.mazeList[i] = []);
+                        for (let j = 0; j < rowNum; j++) {
+                            mazeItem.push({
+                                x: i,
+                                y: j,
+                                noWallList: [], // 哪一面没有墙
+                                visited: false
+                            });
+                        }
+                    }
+                    this.toString();
                     // 随机一个点
                     let currentPoint = this.mazeList[this.random(colNum)][this.random(rowNum)];
                     currentPoint.visited = true;
@@ -111,6 +102,10 @@
                             const { x: x1, y: y1, direction } = neighborNode;
                             this.mazeList[x1][y1].visited = true;
                             this.cleanWall(x, y, direction);
+                            currentPoint.noWallList = Array.from(new Set([...currentPoint.noWallList, direction]));
+                            neighborNode.noWallList = Array.from(
+                                new Set([...neighborNode.noWallList, this.getReviseDirection(direction)])
+                            );
                             visitedList.push(neighborNode);
                             currentPoint = neighborNode;
                         } else {
@@ -121,17 +116,28 @@
                             }
                         }
                     }
-
                     // 将 0 0 格子 的左边作为入口 和 最后一个格子的下面作为终点
                     this.cleanWall(0, 0, 'L');
                     this.cleanWall(colNum - 1, rowNum - 1, 'D');
+                    this.walk();
                 }
-
+                // 获取相反的方向
+                getReviseDirection(direction) {
+                    switch (direction) {
+                        case 'U':
+                            return 'D';
+                        case 'R':
+                            return 'L';
+                        case 'D':
+                            return 'U';
+                        case 'L':
+                            return 'R';
+                    }
+                }
                 // 生成随机数
                 random(num) {
                     return Math.floor(Math.random() * num);
                 }
-
                 // 清除四周的墙
                 cleanWall(x, y, direction) {
                     const ctx = this.ctx;
@@ -156,6 +162,7 @@
                         x1 = cellWidth * x - lineWidth;
                         y1 = cellWidth * y + lineWidth;
                     }
+                    this.mazeList[x][y].noWallList.push(direction);
                     const width = 2 * this.lineWidth;
                     ctx.clearRect(x1, y1, width, width);
                 }
@@ -178,8 +185,100 @@
                         });
                     });
                 }
+                // 走
+                walk(x = 0, y = 0, direction) {
+                    const { ctx, cellWidth, lineWidth } = this;
+                    if (!direction) {
+                        this.drawPoint(x, y);
+                        return;
+                    }
+                    let x1;
+                    let y1;
+                    if (direction === 'U') {
+                        // 上
+                        x1 = x;
+                        y1 = y - 1;
+                    } else if (direction === 'R') {
+                        // 右
+                        x1 = x + 1;
+                        y1 = y;
+                    } else if (direction === 'D') {
+                        // 下
+                        x1 = x;
+                        y1 = y + 1;
+                    } else if (direction === 'L') {
+                        // 左
+                        x1 = x - 1;
+                        y1 = y;
+                    }
+                    if (this.mazeList[x][y].noWallList.includes(direction) && !this.isSuccess(this.x, this.y)) {
+                        this.x = x1;
+                        this.y = y1;
+                        this.drawPoint(x1, y1);
+                        this.cleanPoint(x, y);
+                        if (this.isSuccess(x1, y1)) {
+                            setTimeout(() => {
+                                alert('成功，请点击进入下一关');
+                                next();
+                            }, 0);
+                            return;
+                        }
+                    }
+                }
+
+                // 判断是否成功
+                isSuccess(x, y) {
+                    const { col, row } = this;
+                    return x === col - 1 && y === row - 1;
+                }
+
+                // 画点
+                drawPoint(x, y) {
+                    const { ctx, cellWidth, lineWidth } = this;
+                    ctx.fillStyle = '#f00';
+                    ctx.beginPath();
+                    ctx.arc(
+                        cellWidth * x + cellWidth / 2,
+                        cellWidth * y + cellWidth / 2,
+                        lineWidth / 2,
+                        0,
+                        2 * Math.PI
+                    );
+                    ctx.fill();
+                }
+                // 清除点
+                cleanPoint(x, y) {
+                    const { ctx, cellWidth, lineWidth } = this;
+                    ctx.clearRect(cellWidth * x + lineWidth, cellWidth * y + lineWidth, cellWidth / 2, cellWidth / 2);
+                }
             }
-            var maze = new MAZE(20, 20);
+
+            //  下一关
+            function next() {
+                rowNum++;
+                document.getElementById('checkPoints').innerHTML = `当前第${rowNum}关`;
+                getMaze(rowNum);
+            }
+            next();
+
+            document.body.addEventListener('keyup', e => {
+                const keyCode = e.keyCode;
+                const { x, y } = maze;
+                switch (keyCode) {
+                    case 38:
+                        maze.walk(x, y, 'U');
+                        break;
+                    case 37:
+                        maze.walk(x, y, 'L');
+                        break;
+                    case 39:
+                        maze.walk(x, y, 'R');
+                        break;
+                    case 40:
+                        maze.walk(x, y, 'D');
+                        break;
+                }
+            });
 
             //随机颜色，十六进制方法；
             function getRandomColor() {
