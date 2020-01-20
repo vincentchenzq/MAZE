@@ -366,7 +366,7 @@
                 },
                 false
             );
-             document.body.addEventListener('keyup', e => {
+            document.body.addEventListener('keyup', e => {
                 const keyCode = e.keyCode;
                 const { x, y } = maze;
                 switch (keyCode) {
@@ -384,6 +384,13 @@
                         break;
                 }
             });
+            document.body.addEventListener(
+                'touchmove',
+                e => {
+                    e.preventDefault();
+                },
+                { passive: false }
+            );
         </script>
     </body>
 </html>
